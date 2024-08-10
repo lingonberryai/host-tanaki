@@ -1,0 +1,37 @@
+{
+  "name": "host-tanaki",
+  "version": "0.0.1",
+  "description": "A blank AI soul built for the OPEN SOULS Soul Engine",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@opensouls/engine": "^0.1.54",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.30",
+    "@types/socket.io": "^3.0.1",
+    "axios": "^1.6.8",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2",
+    "socket.io": "^4.7.5",
+    "soul-engine": "^0.1.54"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  },
+  "soulEngine": {
+    "defaultModel": "fast"
+  },
+  "private": true
+}

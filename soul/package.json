@@ -9,7 +9,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "Professor P",
   "license": "UNLICENSED",
   "devDependencies": {
     "@types/common-tags": "^1.8.4",

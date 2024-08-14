@@ -1,12 +1,16 @@
 import "dotenv/config";
-import { Client, Message } from "discord.js";
+import { Client, Message, TextChannel, Events, GatewayIntentBits, Partials } from "discord.js";
 import { ActionEvent, Soul } from "@opensouls/engine";
 import fetch from "node-fetch";
+import path from "path";
 import express from "express";
 import http from "http";
 import { Server as SocketIOServer } from "socket.io";
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { fileURLToPath } from "url";
+
+// Define __filename and __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export type DiscordEventData = {
   type: "messageCreate";
@@ -17,6 +21,8 @@ export type DiscordEventData = {
   userDisplayName: string;
   atMentionUsername: string;
   repliedToUserId?: string;
+  timestamp: number;
+  isBot: boolean;
 };
 
 function createDiscordEventData(message: Message): DiscordEventData {
@@ -29,41 +35,77 @@ function createDiscordEventData(message: Message): DiscordEventData {
     userDisplayName: message.member?.displayName || message.author.username,
     atMentionUsername: message.author.username,
     repliedToUserId: message.mentions.users.first()?.id,
+    timestamp: Date.now(),
+    isBot: message.author.bot,
   };
 }
 
 const client = new Client({
-  intents: ["Guilds", "GuildMessages", "GuildMembers", "MessageContent"],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+  ],
+  partials: [Partials.Channel, Partials.Message, Partials.User],
 });
-
-const lastMessageChannel = new Map<string, Message>();
 
 client.on("ready", () => {
-  console.log("sup i am ready");
-});
-
-client.on("messageCreate", (message) => {
-  if (message.author.bot) return; // Ignore bot's own messages
-  console.log(`🗣️ ${message.author.username}: ${message.content}`);
-  // Store the message context to use for replies
-  lastMessageChannel.set(message.channelId, message);
+  console.log("Host ready!");
+  console.log("Logged in as:", client.user?.tag);
+  console.log("Bot ID:", client.user?.id);
 });
 
 const soul = new Soul({
   organization: "snilgus",
   blueprint: "host-tanaki",
-  soulId: "00",
+  soulID: "01",
   token: process.env.SOUL_ENGINE_API_KEY,
   debug: true,
 });
 
-soul
-  .connect()
-  .then(() => {
-    console.log("Soul connected successfully.");
-  })
+soul.connect().then(() => {
+  console.log("Soul connected successfully.");
+}).catch(console.error);
 
-  .catch(console.error);
+client.on(Events.MessageCreate, async (message) => {
+  console.log("Received message:");
+  console.log("- Content:", message.content);
+  console.log("- Author:", message.author.tag);
+  console.log("- Is bot:", message.author.bot);
+  console.log("- Channel:", message.channel.id);
+  console.log("- Guild:", message.guild?.id || "DM");
+
+  // Ignore messages from self to prevent potential loops
+  if (message.author.id === client.user?.id) {
+    console.log("Ignoring message from self");
+    return;
+  }
+
+  console.log(`🗣️ ${message.author.username} ${message.author.bot ? '(BOT)' : ''}: ${message.content}`);
+
+  const discordEvent = createDiscordEventData(message);
+
+  // Process messages from both humans and bots
+  soul.dispatch({
+    action: "chatted",
+    content: message.content,
+    name: discordEvent.atMentionUsername,
+    _metadata: {
+      discordEvent,
+      discordUserId: client.user?.id,
+    },
+  });
+});
+
+const lastMessageChannel = new Map<string, Message>();
+
+client.on("messageCreate", (message) => {
+  console.log(`🗣️ ${message.author.username}: ${message.content}`);
+  // Store the message context to use for replies
+  lastMessageChannel.set(message.channelId, message);
+});
 
 soul.on("says", async ({ content }: { content: () => Promise<string> }) => {
   const channelId = Array.from(lastMessageChannel.keys())[
@@ -138,22 +180,6 @@ soul.on("paint", async (evt: ActionEvent) => {
   }
 });
 
-client.on("messageCreate", (message) => {
-  if (message.author.bot) return; // Ignore bot's own messages
-
-  const discordEvent = createDiscordEventData(message);
-
-  soul.dispatch({
-    action: "chatted",
-    content: message.content,
-    name: discordEvent.atMentionUsername,
-    _metadata: {
-      discordEvent,
-      discordUserId: client.user?.id,
-    },
-  });
-});
-
 const app = express();
 const server = http.createServer(app);
 const io = new SocketIOServer(server);
@@ -165,13 +191,9 @@ console.log = (...args) => {
   io.emit('log', args.join(' '));
 };
 
-// Add this near the top of the file, after the imports
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 // Serve the HTML page
 app.get('/', (req, res) => {
-  res.sendFile(join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Start the server
@@ -180,4 +202,4 @@ server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
 
-client.login(process.env.BOT_TOKEN_OZ);
+client.login(process.env.BOT_TOKEN);

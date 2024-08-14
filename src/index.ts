@@ -12,6 +12,7 @@ export type DiscordEventData = {
   userDisplayName: string;
   atMentionUsername: string;
   repliedToUserId?: string;
+  isHost: boolean;
 };
 
 function createDiscordEventData(message: Message): DiscordEventData {
@@ -24,6 +25,7 @@ function createDiscordEventData(message: Message): DiscordEventData {
     userDisplayName: message.member?.displayName || message.author.username,
     atMentionUsername: message.author.username,
     repliedToUserId: message.mentions.users.first()?.id,
+    isHost: message.author.bot,
   };
 }
 
@@ -43,8 +45,8 @@ client.on("ready", () => {
 });
 
 client.on("messageCreate", (message) => {
-  if (message.author.bot) return; // Ignore bot's own messages
-  console.log(`🗣️ ${message.author.username}: ${message.content}`);
+  const emoji = message.author.bot ? "🤖" : "👤";
+  console.log(`${emoji} ${message.author.username}: ${message.content}`);
   // Store the message context to use for replies
   lastMessageChannel.set(message.channelId, message);
 });
@@ -69,15 +71,15 @@ soul.on("says", async ({ content }) => {
     lastMessageChannel.size - 1
   ];
   const message = lastMessageChannel.get(channelId);
-  if (message) {
+  if (message && message.author.id !== client.user?.id) {
     const response = await content();
-    console.log(`Bot is replying to ${message.author.username}: ${response}`);
+    console.log(`🤖 Host is replying to ${message.author.username}: ${response}`);
     message.reply(response).catch(console.error);
     lastMessageChannel.delete(channelId);
   }
 });
 
-soul.on("paint", async (evt: ActionEvent) => {
+soul.on("paint", async (evt: any) => {
   console.log("🎨👻 paint interaction request detected from soul:");
   console.log("Received event:", JSON.stringify(evt, null, 2));
 
@@ -148,7 +150,10 @@ soul.on("paint", async (evt: ActionEvent) => {
 });
 
 client.on("messageCreate", (message) => {
-  if (message.author.bot) return; // Ignore bot's own messages
+  if (message.author.id === client.user?.id) {
+    console.log("Ignoring message from self");
+    return;
+  }
 
   const discordEvent = createDiscordEventData(message);
 
